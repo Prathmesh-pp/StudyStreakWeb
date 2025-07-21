@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyStreak_Web</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes gradientText {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .gradient-text {
+      background: linear-gradient(45deg, #8b5cf6, #ec4899, #3b82f6, #f59e0b);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradientText 5s ease infinite;
+    }
+    @keyframes wave {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+      100% { transform: translateY(0); }
+    }
+    .wave-animation {
+      animation: wave 8s ease-in-out infinite;
+    }
+    .challenge-card {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .challenge-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+    }
+    .leaderboard-row:nth-child(even) {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .leaderboard-row:hover {
+      background: rgba(139, 92, 246, 0.2);
+      transform: scale(1.02);
+      transition: all 0.3s ease;
+    }
+    @keyframes fadeIn {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in {
+      animation: fadeIn 0.5s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-800 via-purple-800 to-indigo-900 text-white min-h-screen font-sans">
+  <div id="loginPage" class="flex items-center justify-center min-h-screen hidden">
+    <div class="bg-white/10 backdrop-blur-lg p-8 rounded-lg shadow-xl w-full max-w-md">
+      <h2 class="text-3xl font-bold text-center mb-6">Welcome, Warrior!</h2>
+      <input id="usernameInput" type="text" placeholder="Enter your name" class="w-full p-3 mb-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500">
+      <button onclick="login()" class="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-lg font-semibold">Join the Streak</button>
+    </div>
+  </div>
+
+  <div id="mainPage" class="hidden">
+    <header class="p-8 text-center">
+      <h1 class="text-5xl md:text-6xl font-extrabold tracking-tight gradient-text text-shadow-lg wave-animation">Welcome Warriors, Let's Conquer Today's Challenges!</h1>
+    </header>
+
+    <main class="max-w-5xl mx-auto p-6">
+      <section class="mb-12 fade-in">
+        <h2 class="text-3xl font-bold mb-6 text-purple-300">Today's Challenges</h2>
+        <div id="challengeList" class="space-y-4"></div>
+        <div id="submissionStatus" class="mt-4 text-lg"></div>
+        <div class="flex space-x-4 mt-6">
+          <button onclick="addChallenge()" class="py-2 px-6 bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 rounded-lg text-lg font-semibold transform hover:scale-105 transition-all">Add New Challenge</button>
+          <button id="saveButton" onclick="saveChallenges()" class="py-2 px-6 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg text-lg font-semibold transform hover:scale-105 transition-all">Save Completed Challenges</button>
+        </div>
+      </section>
+
+      <section class="fade-in">
+        <h2 class="text-3xl font-bold mb-6 text-purple-300">Leaderboard</h2>
+        <div id="leaderboard" class="bg-white/10 backdrop-blur-md p-6 rounded-lg shadow-lg"></div>
+      </section>
+
+      <section id="adminPanel" class="mt-12 hidden fade-in">
+        <h2 class="text-3xl font-bold mb-6 text-purple-300">Admin Panel</h2>
+        <div class="bg-white/10 backdrop-blur-md p-6 rounded-lg shadow-lg">
+          <h3 class="text-xl font-semibold mb-4 text-purple-200">Remove Users</h3>
+          <div id="userList" class="space-y-2"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const taskPoints = {
+      'writing notes': 10,
+      'tatva ex1': 40,
+      'tatva ex2': 40,
+      'tatva ex3': 40,
+      'tatva ex4': 40,
+      'tatva ex1 half': 20,
+      'tatva ex2 half': 20,
+      'tatva ex3 half': 20,
+      'tatva ex4 half': 20,
+      'revise notes': 10,
+      'solved pyq': 20,
+      'backlog lecture': 20
+    };
+
+    const ranks = [
+      { min: 0, max: 100, title: 'Beginner' },
+      { min: 101, max: 500, title: 'Brown' },
+      { min: 501, max: 1000, title: 'Silver' },
+      { min: 1001, max: 1500, title: 'Gold' },
+      { min: 1501, max: 2000, title: 'Diamond' },
+      { min: 2001, max: Infinity, title: 'Masters' }
+    ];
+
+    const adminUsername = 'Prathmesh Panchal'; // Replace with your actual username
+    let userData = JSON.parse(localStorage.getItem('studyStreakUsers')) || {};
+    let currentUser = localStorage.getItem('currentUser');
+    let challenges = JSON.parse(localStorage.getItem('studyStreakChallenges')) || [
+      { name: 'Written notes ', points: 10 },
+      { name: 'Solve Tatva book Ex1/2/3/4', points: 40 },
+      { name: 'Revise notes', points: 10 },
+      { name: 'Solve PYQs ', points: 40 },
+      { name: 'Watch backlog lecture ', points: 20 },
+      { name: 'Attended all lectures ', points: 20 },
+      { name: 'solve NCERT', points: 20 },
+      { name: 'solve previous year papers', points: 30 },
+      { name: 'solve mock test', points: 20 },
+      { name: 'solve mock test with analysis', points: 30 },
+      { name: 'solve VDPP', points: 20 },
+      { name: 'other ', points: 20 }
+    ];
+
+    function login() {
+      const username = document.getElementById('usernameInput').value.trim().toLowerCase();
+      if (username) {
+        if (!userData[username]) {
+          userData[username] = { points: 0, challenges: [], completedChallenges: [], lastSubmissionDate: null };
+        }
+        currentUser = username;
+        localStorage.setItem('currentUser', username);
+        localStorage.setItem('studyStreakUsers', JSON.stringify(userData));
+        showMainPage();
+      }
+    }
+
+    function showMainPage() {
+      document.getElementById('loginPage').classList.add('hidden');
+      document.getElementById('mainPage').classList.remove('hidden');
+      if (currentUser.toLowerCase() === adminUsername.toLowerCase()) {
+        document.getElementById('adminPanel').classList.remove('hidden');
+        loadAdminPanel();
+      }
+      loadChallenges();
+      updatePill
+      updateLeaderboard();
+      checkSubmissionStatus();
+    }
+
+    function loadChallenges() {
+      const challengeList = document.getElementById('challengeList');
+      challengeList.innerHTML = '';
+      challenges.forEach((challenge, index) => {
+        const isChecked = userData[currentUser].challenges.includes(challenge.name);
+        const challengeItem = document.createElement('div');
+        challengeItem.className = 'flex items-center p-4 bg-white/20 rounded-lg challenge-card';
+        challengeItem.innerHTML = `
+          <input type="checkbox" id="challenge${index}" ${isChecked ? 'checked' : ''} class="mr-3 h-5 w-5" ${isSubmissionAllowed() ? '' : 'disabled'}>
+          <label for="challenge${index}">${challenge.name} (+${challenge.points} points)</label>
+        `;
+        challengeList.appendChild(challengeItem);
+      });
+    }
+
+    function addChallenge() {
+      const challengeName = prompt("Enter new challenge name:").toLowerCase();
+      if (challengeName) {
+        let points = 0;
+        for (const [keyword, pts] of Object.entries(taskPoints)) {
+          if (challengeName.includes(keyword)) {
+            points = pts;
+            break;
+          }
+        }
+        if (!points) {
+          points = parseInt(prompt("No matching task type found. Enter points for this challenge:"));
+          if (isNaN(points)) points = 10;
+        }
+        challenges.push({ name: challengeName, points });
+        localStorage.setItem('studyStreakChallenges', JSON.stringify(challenges));
+        loadChallenges();
+      }
+    }
+
+    function isSubmissionAllowed() {
+      const today = new Date().toISOString().split('T')[0];
+      const lastSubmission = userData[currentUser].lastSubmissionDate;
+      return !lastSubmission || lastSubmission !== today;
+    }
+
+    function checkSubmissionStatus() {
+      const submissionStatus = document.getElementById('submissionStatus');
+      const saveButton = document.getElementById('saveButton');
+      if (!isSubmissionAllowed()) {
+        submissionStatus.innerHTML = '<span class="text-red-400">You have already submitted tasks for today. Come back tomorrow!</span>';
+        saveButton.classList.add('opacity-50', 'cursor-not-allowed');
+        saveButton.disabled = true;
+      } else {
+        submissionStatus.innerHTML = '<span class="text-green-400">You can submit your tasks for today!</span>';
+        saveButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        saveButton.disabled = false;
+      }
+    }
+
+    function saveChallenges() {
+      if (!isSubmissionAllowed()) {
+        alert("You've already submitted tasks for today!");
+        return;
+      }
+      userData[currentUser].challenges = [];
+      challenges.forEach((challenge, index) => {
+        const checkbox = document.getElementById(`challenge${index}`);
+        if (checkbox.checked) {
+          userData[currentUser].challenges.push(challenge.name);
+          if (!userData[currentUser].completedChallenges?.includes(challenge.name)) {
+            userData[currentUser].points = (userData[currentUser].points || 0) + challenge.points;
+            userData[currentUser].completedChallenges = userData[currentUser].completedChallenges || [];
+            userData[currentUser].completedChallenges.push(challenge.name);
+          }
+        }
+      });
+      userData[currentUser].lastSubmissionDate = new Date().toISOString().split('T')[0];
+      localStorage.setItem('studyStreakUsers', JSON.stringify(userData));
+      updateLeaderboard();
+      checkSubmissionStatus();
+    }
+
+    function getRank(points) {
+      return ranks.find(rank => points >= rank.min && points <= rank.max).title;
+    }
+
+    function updateLeaderboard() {
+      const leaderboard = document.getElementById('leaderboard');
+      const users = Object.entries(userData).map(([name, data]) => ({
+        name,
+        points: data.points,
+        rank: getRank(data.points)
+      }));
+      users.sort((a, b) => b.points - a.points);
+      leaderboard.innerHTML = `
+        <div class="grid grid-cols-4 gap-4 font-bold text-lg mb-4 text-purple-200">
+          <span>Rank</span><span>Name</span><span>Points</span><span>Title</span>
+        </div>
+      `;
+      users.forEach((user, index) => {
+        leaderboard.innerHTML += `
+          <div class="grid grid-cols-4 gap-4 py-2 leaderboard-row">
+            <span>${index + 1}</span><span>${user.name}</span><span>${user.points}</span><span>${user.rank}</span>
+          </div>
+        `;
+      });
+    }
+
+    function loadAdminPanel() {
+      const userList = document.getElementById('userList');
+      userList.innerHTML = '';
+      Object.keys(userData).forEach(username => {
+        if (username.toLowerCase() !== adminUsername.toLowerCase()) {
+          const userItem = document.createElement('div');
+          userItem.className = 'flex justify-between items-center p-2 bg-gray-800/50 rounded';
+          userItem.innerHTML = `
+            <span>${username}</span>
+            <button onclick="removeUser('${username}')" class="py-1 px-3 bg-red-600 hover:bg-red-700 rounded">Remove</button>
+          `;
+          userList.appendChild(userItem);
+        }
+      });
+    }
+
+    function removeUser(username) {
+      if (confirm(`Are you sure you want to remove ${username}?`)) {
+        delete userData[username];
+        localStorage.setItem('studyStreakUsers', JSON.stringify(userData));
+        loadAdminPanel();
+        updateLeaderboard();
+      }
+    }
+
+    if (currentUser && userData[currentUser]) {
+      showMainPage();
+    } else {
+      document.getElementById('loginPage').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
